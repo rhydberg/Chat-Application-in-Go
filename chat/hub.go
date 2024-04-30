@@ -4,6 +4,10 @@ import (
 	// "fmt"
 	"log"
 	"sync"
+	"time"
+
+	
+	"gorm.io/gorm"
 )
 
 
@@ -13,6 +17,7 @@ type Message struct {
 	Type int
 	Sender string
 	Content string
+	CreatedAt time.Time
 }
 
 type Hub struct {
@@ -20,16 +25,18 @@ type Hub struct {
 	Register   chan *Client
 	Message    chan Message
 	Unregister chan *Client
+	DB		 *gorm.DB
 
 	sync.RWMutex
 }
 
-func NewHub() *Hub {
+func NewHub(db *gorm.DB) *Hub {
 	return &Hub{
 		Clients:    make(ClientList),
 		Message:    make(chan Message),
 		Register:   make(chan *Client),
 		Unregister: make(chan *Client),
+		DB: db,
 	}
 }
 
@@ -51,8 +58,8 @@ func (h *Hub) UnregisterClient(client *Client){
 	// defer h.Unlock()
 
 	if _, ok:= h.Clients[client]; ok{
-		client.conn.Close()
-		close(client.send)
+		client.Conn.Close()
+		close(client.Send)
 		delete(h.Clients, client)
 
 		log.Println("Unregistered Client")
@@ -90,15 +97,28 @@ func (h *Hub) Run() {
 	}
 }
 
+func (h *Hub) GetRecentMessages(n int) []Message {
+
+
+	var messages []Message
+	h.DB.Limit(n).Order("ID desc").Find(&messages)
+	return messages
+}
+
 func (h *Hub) handleMessage(msg Message) {
 	m:=Message{}
-	if m == msg{
+	if m == msg{ //checking for empty message
 		return
 
 	}
+	msg.CreatedAt = time.Now()
+	// msg = Message{
+
+	h.DB.Create(&msg)
+
 	for client := range h.Clients {
 		select {
-		case client.send <- msg:
+		case client.Send <- msg:
 			log.Printf("sent msg to client")
 		default:
 			h.Unregister<-client

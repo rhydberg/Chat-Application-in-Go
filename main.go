@@ -5,7 +5,13 @@ import (
 	"github.com/rhydberg/chat-app/chat"
 	"log"
 	"net/http"
+	
+	"github.com/rhydberg/chat-app/models"
+	"github.com/rhydberg/chat-app/db"
+	// "gorm.io/driver/postgres"
+  	// "gorm.io/gorm"
 )
+
 
 var allowedOrigin = "http://localhost:3000"
 
@@ -23,37 +29,8 @@ func checkOrigin(r *http.Request) bool{
 }
 
 
-var hub *chat.Hub = chat.NewHub()
+var hub *chat.Hub 
 
-// func echo(w http.ResponseWriter, r *http.Request) {
-// 	conn, err := upgrader.Upgrade(w, r, nil)
-// 	if err != nil {
-// 		log.Fatal("Upgrading to websocket failed")
-// 	}
-// 	go func() {
-
-// 		defer conn.Close()
-
-// 		for {
-// 			msgtype, msg, err := conn.ReadMessage()
-// 			if err != nil {
-// 				fmt.Println("Could not Read message")
-// 			}
-
-// 			fmt.Printf("Received %s of msgtype %v\n", msg, msgtype)
-// 			response := fmt.Sprintf("%s%s", "Echoing : ", msg)
-// 			if err := conn.WriteMessage(msgtype, []byte(response)); err != nil {
-// 				fmt.Printf("Error %x\n", err)
-// 			}
-
-// 		}
-// 	}()
-
-// }
-
-// func hello(w http.ResponseWriter, r *http.Request) {
-// 	w.Write([]byte("Hello, World!"))
-// }
 
 func room(w http.ResponseWriter, r *http.Request) {
 	// fmt.Println("in room")
@@ -69,6 +46,14 @@ func room(w http.ResponseWriter, r *http.Request) {
 	log.Println("After making client")
 	hub.Register <- client
 
+
+	
+	recentMessages := hub.GetRecentMessages(5)
+	log.Println("Recent messages are ", len(recentMessages))
+	for _,msg := range recentMessages{
+		conn.WriteJSON(msg)
+	}
+
 	
 	go client.Read()
 	go client.Write()
@@ -76,12 +61,21 @@ func room(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
+	// var messages []models.Message
+
+	db := db.Init()
+	db.AutoMigrate(&models.Message{})
+
+	// db.Limit(2).Order("ID desc").Find(&messages)
+	// log.Println(messages)
+	hub = chat.NewHub(db)
+
 	router := http.NewServeMux()
-	// router.HandleFunc("/hello", hello)
-	// router.HandleFunc("/echo", echo)
 	router.HandleFunc("/room", room)
 
 	go hub.Run()
+
+
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 

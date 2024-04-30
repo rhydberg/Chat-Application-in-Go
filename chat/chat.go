@@ -24,17 +24,17 @@ const (
 )
 
 type Client struct {
-	hub  *Hub
-	send chan Message
-	conn *websocket.Conn
+	Hub  *Hub
+	Send chan Message
+	Conn *websocket.Conn
 }
 
 func NewClient(hub *Hub, conn *websocket.Conn) *Client {
 
 	return &Client{
-		hub:  hub,
-		send: make(chan Message),
-		conn: conn,
+		Hub:  hub,
+		Send: make(chan Message),
+		Conn: conn,
 	}
 
 }
@@ -42,33 +42,34 @@ func NewClient(hub *Hub, conn *websocket.Conn) *Client {
 func (c *Client) Write() {
 	ticker := time.NewTicker(pingPeriod)
 	defer func(){
-		c.conn.Close()
-		c.hub.Unregister <- c
+		c.Conn.Close()
+		c.Hub.Unregister <- c
 		ticker.Stop()
 	}()
 
 
+
 	for {
 		select {
-		case message, ok := <-c.send:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+		case message, ok := <-c.Send:
+			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if !ok {
 				// The hub closed the channel.
-				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
 				log.Println("Connection closed")
-				c.hub.Unregister <- c
+				c.Hub.Unregister <- c
 				return
 			} else {
-				err := c.conn.WriteJSON(message)
+				err := c.Conn.WriteJSON(message)
 				if err != nil {
 					log.Println("Error: ", err)
 					break
 				}
 			}
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
 			log.Println("ping sent")
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err!= nil {
+			if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err!= nil {
 				return
 			}
 		}
@@ -80,19 +81,19 @@ func (c *Client) Write() {
 func (c *Client) Read() {
 	
 	defer func(){
-		c.hub.Unregister <- c
+		c.Hub.Unregister <- c
 	}()
-	c.conn.SetReadLimit(maxMessageSize)
-	c.conn.SetReadDeadline(time.Now().Add(pongWait))
-	c.conn.SetPongHandler(func(string) error { c.conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
+	c.Conn.SetReadLimit(maxMessageSize)
+	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.Conn.SetPongHandler(func(string) error { c.Conn.SetReadDeadline(time.Now().Add(pongWait)); return nil })
 
 	for {
-		msgtype, msg, err := c.conn.ReadMessage()
+		msgtype, msg, err := c.Conn.ReadMessage()
 		m:= new(Message)
 		
 		if err != nil {
 			log.Println("Error reading message")
-			c.hub.Unregister <- c
+			c.Hub.Unregister <- c
 			break
 		} else if msgtype != 1 {
 			log.Println("Message other than Textmessag received")
@@ -107,7 +108,7 @@ func (c *Client) Read() {
 			log.Println("Received message ", m)
 		}
 
-		c.hub.Message <- *m
+		c.Hub.Message <- *m
 	}
 
 }
