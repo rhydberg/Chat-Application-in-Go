@@ -75,6 +75,7 @@ func main() {
 
 	router := http.NewServeMux()
 	router.HandleFunc("/room", room)
+	router.HandleFunc("/hello", func(w http.ResponseWriter, r *http.Request) {w.Write([]byte("hello"))})
 
 	go hub.Run()
 
