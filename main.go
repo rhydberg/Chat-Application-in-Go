@@ -1,15 +1,17 @@
 package main
 
 import (
-	"github.com/gorilla/websocket"
-	"github.com/rhydberg/chat-app/chat"
 	"log"
 	"net/http"
-	
-	"github.com/rhydberg/chat-app/models"
+	"slices"
+
+	"github.com/gorilla/websocket"
+	"github.com/rhydberg/chat-app/chat"
+
 	"github.com/rhydberg/chat-app/db"
+	"github.com/rhydberg/chat-app/models"
 	// "gorm.io/driver/postgres"
-  	// "gorm.io/gorm"
+	// "gorm.io/gorm"
 )
 
 
@@ -49,6 +51,7 @@ func room(w http.ResponseWriter, r *http.Request) {
 
 	
 	recentMessages := hub.GetRecentMessages(5)
+	slices.Reverse(recentMessages)
 	log.Println("Recent messages are ", len(recentMessages))
 	for _,msg := range recentMessages{
 		conn.WriteJSON(msg)
